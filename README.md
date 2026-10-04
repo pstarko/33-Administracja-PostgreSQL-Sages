@@ -34,4 +34,4 @@ Przed szkoleniem zainstaluj:
 
 
 ```bash
-git clone https://github.com/pstarko/25-PostgreSQL-programowanie-Sages.git
+git clone https://github.com/pstarko/33-Administracja-PostgreSQL-Sages.git
