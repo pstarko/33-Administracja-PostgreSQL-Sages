@@ -1,0 +1,178 @@
+--Wewnętrzne mechanizmy transakcyjności 
+
+--Zwykły VACUUM 
+drop table wielka;
+
+create table wielka (x integer,y varchar); 
+
+do
+$$ 
+	begin 
+		for x in 1 .. 1000000 loop 
+			INSERT INTO WIELKA VALUES (x,'X='||x); end loop; 
+	end; 
+$$; 
+
+--Wielkość tabeli
+select 
+	relname ,
+	pg_size_pretty(pg_total_relation_size( oid) ), 
+	pg_relation_filepath( oid)
+from pg_class where relname='wielka'; 
+
+--wielka		42 MB	base/5/172038
+--wielka		77 MB	base/5/172038
+--wielka		35 MB	base/5/172043
+
+vacuum verbose wielka; 
+
+update wielka set y='xxx'; 
+
+vacuum verbose wielka; 
+
+vacuum full verbose wielka; 
+
+--największe tabele w bazie
+SELECT nspname ||'.' || relname AS "relation", 
+pg_size_pretty(pg_relation_size(C.oid)) AS "size" 
+FROM pg_class C 
+LEFT JOIN pg_namespace N ON (N.oid = C.relnamespace) 
+WHERE nspname NOT IN ('pg_catalog', 'information_schema') ORDER BY pg_relation_size(C.oid) DESC 
+LIMIT 20; 
+
+--Automatyczny VACUUM - autovacuum 
+
+show autovacuum
+
+show autovacuum_naptime; 
+
+show autovacuum_max_workers;
+
+/*
+ile to jest „znacząca liczba wierszy" ? 
+Liczba ta jest określana na podstawie wartości parametrów "autovacuum vacuum scale factor" 
+"autovacuum_vacuum_threshold". Wzór wygląda tak: 
+
+liczba wierszy, których zmiana spowoduje uruchomienie autovacuum = 
+		liczba wierszy w tabeli* autovacuum_vacuum_scale_factor+autovacuum_vacuum_threshold 
+
+Domyślną wartością dla "autovacuum_vacuum_scale_factor" jest 0.2: 
+Domyślną wartością dla "autovacuum_vacuum_threshold" jest 50. 
+*/
+show autovacuum_vacuum_scale_factor
+show autovacuum_vacuum_threshold
+
+select 750000*0.2+50
+
+
+--Wewnętrzne mechanizmy transakcyjności 
+
+--Zwykły VACUUM 
+
+drop table wielka 
+
+create table wielka2 (x integer,y varchar); 
+
+do
+$$ 
+	begin 
+		for x in 1 .. 1000000 loop 
+			INSERT INTO WIELKA2 VALUES (x,'X='||x); end loop; 
+	end; 
+$$; 
+
+select 
+	relname ,
+	last_vacuum, 
+	last_autovacuum, 
+	last_autoanalyze,
+	last_analyze 
+from pg_stat_all_tables where relname='wielka2'; 
+
+vacuum wielka2
+
+
+select current_timestamp
+
+
+update wielka2 set x=x+100; 
+
+
+select 
+	relname,
+	n_tup_ins,
+	n_tup_upd,
+	n_tup_del,
+	n_live_tup,
+	n_dead_tup,n_mod_since_analyze 
+FROM pg_stat_user_tables where relname='wielka2' 
+
+/*
+Co oznaczają poszczególne kolumny? 
+	"relname"- nazwa tabeli 
+	"n_tup_ins"- informacja, ile wierszy wstawiono do danej tabeli od początku jej istnienia 
+	"n_tup_upd"- liczba wierszy, która została w tej tabeli zaktualizowana od początku jej istnienia 
+	"n_tup_del"- liczba wierszy skasowanych z tabeli od początku jej istnienia 
+	"n_live_tup"- liczba "żywych" wierszy, czyli takich, które nie są martwymi wierszami pozostałymi po transakcjach 
+					( w skrócie - ile jest wierszy w tabeli) 
+	"n_dead_tup"- informacja, ile mamy martwych, pozostałych po transakcjach wierszy niezarejestrowanych jeszcze w FSM od ostatniego (ręcznego lub automatycznego) VACUUM. Po wykonaniu vacuum wartości w tej kolumnie się zerują. 
+	"n_mod_since_analyze- informacja o liczbie wierszy zmodyfikowanych/dodanych/skasowanych od ostatniego VACUUM - automatycznego bądź wywołanego ręcznie 
+*/
+
+--Vacuum a wydajność
+
+show shared_buffers; 
+
+drop table wielka3; 
+
+create table wielka3(x integer,y text); 
+
+do $$ 
+	begin 
+		for x in 1 .. 20000000 loop 
+		insert into wielka3 values (x,'element numer '||x); end loop; 
+	end $$; 
+
+checkpoint; 
+
+
+select 
+	relname ,
+	pg_size_pretty(pg_total_relation_size( oid) ), 
+	pg_relation_filepath( oid)
+from pg_class where relname='wielka3';
+
+--1148 MB
+
+explain analyze select * from wielka3; 
+
+--Execution Time: 3343.462 ms
+
+alter table wielka3 set (autovacuum_enabled=false); 
+
+select relname,reloptions from pg_class where relname='wielka3'; 
+
+select relname, last_vacuum,last_autovacuum from pg_stat_all_tables where relname='wielka3'; 
+
+update wielka3 set x=x+100;
+checkpoint; 
+
+
+explain analyze select * from wielka3; 
+--Execution Time: 14664.742 ms
+
+vacuum wielka3; 
+
+explain analyze select * from wielka3; 
+--Execution Time: 1995.166 ms
+
+vacuum full wielka3; 
+explain analyze select * from wielka3;
+
+drop table wielka3
+
+
+
+
+
+
