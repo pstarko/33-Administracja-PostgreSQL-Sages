@@ -1,3 +1,10 @@
+SELECT datname,
+       age(datfrozenxid) xid_age
+FROM pg_database
+ORDER BY xid_age DESC;
+
+
+
 --Wewnętrzne mechanizmy transakcyjności 
 
 --Zwykły VACUUM 
@@ -30,7 +37,7 @@ update wielka set y='xxx';
 
 vacuum verbose wielka; 
 
-vacuum full verbose wielka; 
+vacuum full verbose wielka2; 
 
 --największe tabele w bazie
 SELECT nspname ||'.' || relname AS "relation", 
@@ -62,7 +69,7 @@ Domyślną wartością dla "autovacuum_vacuum_threshold" jest 50.
 show autovacuum_vacuum_scale_factor
 show autovacuum_vacuum_threshold
 
-select 750000*0.2+50
+select 20000000*0.2+50
 
 
 --Wewnętrzne mechanizmy transakcyjności 
@@ -88,6 +95,8 @@ select
 	last_autoanalyze,
 	last_analyze 
 from pg_stat_all_tables where relname='wielka2'; 
+
+select * from wielka2 where x = 102
 
 vacuum wielka2
 
@@ -161,18 +170,12 @@ checkpoint;
 explain analyze select * from wielka3; 
 --Execution Time: 14664.742 ms
 
-vacuum wielka3; 
+vacuum wielka3;  --693914
 
-explain analyze select * from wielka3; 
+explain analyze select * from wielka3; --493921
 --Execution Time: 1995.166 ms
 
 vacuum full wielka3; 
 explain analyze select * from wielka3;
 
 drop table wielka3
-
-
-
-
-
-
