@@ -1,0 +1,280 @@
+--TABLESPACE
+
+-- Przestrzenie tabel
+
+select * from pg_tablespace; 
+
+show data_directory
+
+
+create tablespace kolejna owner dzik location '/kolejna' with (seq_page_cost=2, random_page_cost=1 ); 
+
+select spcname,pg_tablespace_location(oid) from pg_tablespace; 
+
+--Sprawdzanie właściciela przestrzeni tabel
+select spcname,usename from pg_tablespace t join pg_user u on spcowner=u.usesysid; 
+
+--Umieszczanie obiektów w przestrzeniach tabel 
+create database nowa_tb tablespace = tabsp;
+
+--sprawdzamy czy jest ok
+select datname,spcname,pg_tablespace_location(t.oid) 
+from pg_database d join pg_tablespace t on d.dattablespace=t.oid; 
+
+create table tabelka (x integer) tablespace tabsp
+;
+
+select relname,spcname,pg_tablespace_location(t.oid) 
+from pg_class c join pg_tablespace t on c.reltablespace=t.oid where relname='tabelka'; 
+
+--index
+create index indeksik on tabelka(x); 
+
+select * from pg_indexes where indexname='indeksik'; 
+
+--przeniesienie istniejącego indeksu
+alter index indeksik set tablespace tabsp; 
+
+select relname,spcname,pg_tablespace_location(t.oid) 
+from pg_class c join pg_tablespace t 
+on c.reltablespace=t.oid; 
+
+--Parametr default_tablespace 
+
+show default_tablespace;
+
+
+set default_tablespace='tabsp'; 
+
+create table yyy (y integer); 
+
+select relname,spcname from pg_class c join pg_tablespace t on c.reltablespace=t.oid ; 
+
+drop table nowa2;
+
+create database osobna; 
+
+select datname,spcname from pg_database d join pg_tablespace t on t.oid=d.dattablespace where datname='osobna'; 
+
+
+alter system set default_tablespace=tabsp; 
+
+select pg_reload_conf(); 
+
+create table nowa(x integer); 
+
+select relname,spcname from pg_class c join pg_tablespace t 
+on c.reltablespace=t.oid 
+where relname='nowa'; 
+
+
+alter system set default_tablespace=pg_default; 
+
+select pg_reload_conf(); 
+
+drop tablespace tabsp;
+
+select * from pg_database d join pg_tablespace t on t.oid=d.dattablespace where spcname='tabsp'
+
+alter database nowa_tb set tablespace pg_default;
+
+--Masowe Przenoszenie
+
+create table abc (x integer) tablespace tabsp2; 
+create table def (x integer) tablespace tabsp2; 
+create table ghi (x integer) tablespace tabsp2; 
+
+--Sprawdźmy ich położenie
+
+select c.oid,pg_relation_filepath(c.oid) ,relname,spcname, 
+pg_tablespace_location(t.oid) 
+from pg_class c left join pg_tablespace t on c.reltablespace=t.oid where relname in ('abc','def','ghi'); 
+
+
+alter table all in tablespace tabsp2 set tablespace pg_default
+
+--Schematy
+
+select * from information_schema.schemata; 
+
+create user andrzej with password 'pass123'; 
+create user rafal with password 'pass123'; 
+
+
+grant create on schema public to andrzej; 
+
+--Sprawdzanie obiektów znajdujących się w schemacie 
+
+select * from pg_tables; 
+
+--indeksy
+select * from pg_indexes; 
+
+--Tworzenie schematu 
+create schema nazwa_schematu; 
+
+create schema andrew authorization andrzej; 
+
+
+--sprawdź kto jest teraz właścicielem:
+select * from information_schema.schemata; 
+
+
+--Tworzenie obiektów w schemacie 
+
+create table andrew.produkty(id serial primary key, nazwa text);
+
+select * from produkty
+
+--Parametr search_path 
+
+show search_path;
+
+
+
+create schema schemat_a; 
+create schema schemat_b; 
+create table schemat_a.data(x text); 
+create table schemat_b.data(x text); 
+insert into schemat_a.data values ('w schemacie a'); 
+insert into schemat_b.data values ('w schemacie b'); 
+
+--zmieniam search_path
+set search_path=schemat_b ,schemat_a; 
+
+
+select * from data; 
+
+drop table schemat_b.data;
+
+--Schematy i indeksy
+
+create table schemat_a.my_table(x integer); 
+
+create index my_index on schemat_a.my_table(x); 
+
+select * from pg_indexes where indexname='my_index'; 
+
+
+---schematy vs uprawnienia
+create schema boczny; 
+grant create on schema boczny to andrzej; 
+
+--w schemacie bocznym 
+create table t1_boczny(x int);
+select * from t1_boczny;
+
+
+grant usage on schema boczny to andrzej; --??
+
+grant select on t1_boczny to andrzej;
+
+
+--USERZY
+--User & Role
+
+create user dzik with password 'xxx333'; 
+
+select * from pg_user;
+
+/*
+Co oznaczają poszczególne kolumny? 
+	"usename" (tak - nie useRname tylko usename)- nazwa użytkownika 
+	"usesysid" - id tego użytkownika (roli) 
+	"usecreatedb"- określa, czy dana rola może tworzyć bazy danych 
+	"usesuper" -określa, czy dana rola jest superużytkownikiem. Jeśli jest "true" w "usesuper", 
+					to niezaleznie od tego, że w kolumnie "usecreatedb" jest "false", rola ta może tworzyć bazy danych. 
+	_"userepl" -określa, czy dana rola może być użyta do replikacji 
+	"userbypassrls" -określa, czy rola omija wszystkie zasady zabezpieczeń na poziomie wierszy 
+						Więcej: https://www.postgresql.org/docs/current/ddl-rowsecurity.html). 
+	"passwd"- zawsze ukryte pod "********" hasło 
+	"validuntil"- termin, do którego dana rola będzie funkcjonować. Domyślnie nie jest zakładane żadne ograniczenie. 
+	"useconfig" - ustawienia na poziomie roli. Dla przykładu dla użytkownika "dzik" ustawiamy parametr "random_page_cost" na 1: 
+*/
+
+alter user dzik set random_page_cost=1; 
+
+
+select * from pg_authid where rolname='dzik'; 
+
+
+/* 
+Co oznaczają poszczególne kolumny? 
+	"oid"- ID użytkownika 
+	"rolname"- nazwa użytkownika 
+	"rolsuper"- określa, czy dany użytkownik ma uprawnienia superusera._Jeśli użytkownik ma "true" w "rolsuper", 
+					to niezależnie od tego, że ma on ustawione "false" w kolumnach "rolcreaterole" i "rolcreatedb", 
+					może on tworzyć użytkowników i bazy danych. 
+	"rolinherit" -określa, czy dany użytkownik automatycznie dziedziczy uprawnienia grup, których jest członkiem 
+	"rolcreaterole" -definiuje, czy użytkownik może tworzyć innych użytkowników 
+	"rolcreadetedb" -dotyczy możliwości tworzenia baz danych przez użytkownika 
+	"rolcanlogin"- powie nam, czy dany użytkownik może się logować do bazy danych. Niekiedy tworzymy użytkowników, 
+					których jedynym zadaniem jest bycie właścicielem obiektów i wtedy tworzymy użytkownika bez możliwości logowania 
+					- ze względów bezpieczeństwa. 
+	"rolreplication" -określa, czy użytkownik może zostać użyty do replikacji 
+	"rolbypassrls" - podobnie jak w przypadku "pg_user", określa, czy użytkownik omija wszystkie zasady zabezpieczeń na poziomie wierszy 
+	"rolconnlimit"- określa limit połączeń dla danego użytkownika. Domyślna wartość "-1" określa, że taki limit nie jest nakładany. 
+	"rolpassword" - to zazwyczaj zaszyfrowane hasło, może być też puste, jeśli użytkownik takiego nie posiada 
+	"rolvaliduntil", podobnie jak w przypadku "pg_users", to termin, do którego dany użytkownik będzie funkcjonował 
+*/
+
+*/
+grant create on schema public to dzik; 
+
+--Pozostałe parametry możemy stosować wybiórczo. Możemy stworzyć użytkownika np. w ten sposób: 
+
+create user prawie_admin password 'x' createdb createrole; 
+
+
+--Zmiana własności użytkownika (roli) 
+
+create user prawie_admin;
+
+select usename,usecreatedb from pg_user where usename='prawie_admin'; 
+
+
+alter user prawie_admin createdb; 
+
+drop user prawie_admin;
+
+
+--można też modyfikować zbiorczo
+alter user prawie_admin nocreatedb nocreaterole; 
+
+--Zmiana hasła
+Alter user dzik password 'nowe_haslo'; 
+
+
+-- Kasowanie użytkownika
+
+drop user dzik;
+
+
+alter table x1 owner to postgres
+
+--przeniesienie ownera wszystkich obiektów 
+reassign owned by dzik to postgres
+
+--aby usunąc usera koniecznie trzeba ususnąc te uprawnienia
+revoke create on schema public from dzik;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ 
+
+
+
+
