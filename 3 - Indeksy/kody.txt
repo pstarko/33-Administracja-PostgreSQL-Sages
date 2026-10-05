@@ -1,0 +1,35 @@
+CREATE TABLE index_write_test (
+    order_id        BIGSERIAL PRIMARY KEY,
+    customer_id     BIGINT NOT NULL,
+    order_date      DATE NOT NULL,
+    status          TEXT NOT NULL,
+    shipping_region TEXT NOT NULL,
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+
+INSERT INTO index_write_test (
+    customer_id,
+    order_date,
+    status,
+    shipping_region,
+    created_at
+)
+    SELECT
+        1 + floor(random() * 50000)::bigint,
+        CURRENT_DATE - floor(random() * 730)::int,
+        CASE
+            WHEN random() < 0.72 THEN 'completed'
+            WHEN random() < 0.86 THEN 'shipped'
+            WHEN random() < 0.94 THEN 'pending'
+            WHEN random() < 0.98 THEN 'cancelled'
+            ELSE 'returned'
+        END,
+        (ARRAY[
+            'North America',
+            'Europe',
+            'Asia Pacific',
+            'Latin America'
+        ])[1 + floor(random() * 4)::int],
+        now() - (random() * interval '2 years')
+    FROM generate_series(1, 100000);
