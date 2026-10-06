@@ -1,0 +1,58 @@
+--w pliku postgres.conf
+
+1. archive_mode=on; 
+
+2. archive_command = 'test ! -f /archs/%f && cp %p /archs/%f';
+
+--poziom terminala
+3. systemctl restart postgresql
+
+4. 
+sudo mkdir /backups 
+sudo mkdir /backups/backup_3 
+sudo chown -R postgres:postgres /backups/ 
+
+--poziom terminala (user: postgres)
+
+5.pg_basebackup -D /backups/backup_3/ -P 
+
+USTAWIANIE RESTORE (PITR)
+
+--w pliku postgres.conf
+6.
+restore_command = 'cp /archs/%f %p'
+recovery_target_time = '2026-10-06 14:30:00'
+
+Sprawdzić na 100% czy jest:
+	wal_level = replica
+	archive_mode = on
+	archive_command = 'test ! -f /archs/%f && cp %p /archs/%f'
+
+--terminal (poziom postgres)
+7. Czyścimy katalog
+	rm -rf /var/lib/postgresql/18/main/*
+	cp -ap /backups/backup_3/. /var/lib/postgresql/18/main/
+
+8. Uprawnienia:
+	sudo chown -R postgres:postgres /var/lib/postgresql/18/main/
+	sudo chmod 700 /var/lib/postgresql/18/main
+
+9. Utwórz plik recovery.signal (konieczny do możliwości odzysku danych w czasie)
+	touch /var/lib/postgresql/18/main/recovery.signal
+	chown postgres:postgres /var/lib/postgresql/18/main/recovery.signal
+
+10. Uruchom postgres
+	sudo systemctl start postgresql
+
+11. Logi
+	sudo tail -f /var/log/postgresql/postgresql-18-main.log
+
+--poziom bazy danych
+12. Jeśli jest ok to promujemy serwer bazy danych do trybu primary
+	SELECT pg_wal_replay_resume();
+
+
+
+
+
+
