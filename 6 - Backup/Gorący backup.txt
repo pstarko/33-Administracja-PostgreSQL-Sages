@@ -1,0 +1,89 @@
+1. alter system set archive_mode=on; 
+
+2. systemctl restart postgresql
+
+3. 
+sudo mkdir /archs
+sudo chown postgres:postgres /archs
+sudo chmod 700 /archs
+
+4. ALTER SYSTEM SET archive_command = 'test ! -f /archs/%f && cp %p /archs/%f';
+
+5. select pg_reload_conf(); 
+
+6. 
+
+create table archiwizacja(x integer,y text); 
+
+do $$ 
+begin 
+for x in 1 .. 1000000 loop 
+insert into archiwizacja values (x,'element numer '||x); end loop; 
+end $$ ; 
+
+--sprawdź status
+SELECT * FROM pg_stat_archiver;
+
+--przełącz pliki WAL ręczenie - wymuszamy test i sprawdzamy katalog archs czy są nowe pliki
+SELECT pg_switch_wal();
+
+7.
+sudo mkdir /backups 
+sudo mkdir /backups/backup_1 
+sudo chown -R postgres:postgres /backups/ 
+
+8.
+--jako user postgres
+pg_basebackup -D /backups/backup_1/ -P 
+
+--gdyby były inne przestrzenie tabel:
+ pg_basebackup -D /backups/backup_1/ \
+  --tablespace-map=/tabsp2=/backups/tabsp2/ \
+  --tablespace-map=/ssd_data=/backups/ssd_data/ \
+  -R -P
+  
+
+9. Zatrzymaj instancję
+sudo systemctl stop postgresql
+
+10. Wyczyść obecny katalog danych (z poziomu użytkownika postgres)
+sudo rm -rf /var/lib/postgresql/18/main/*       
+
+11. Skopiuj backup
+sudo cp -ap /backups/backup_1/. /var/lib/postgresql/18/main/
+
+12. Gdyby trzeba było odtworzyć inny tablespace:
+
+Odtwórz TABLESPACE
+		sudo rm -rf /tabsp2/* 
+		sudo cp -a /backups/tabsp2/. /tabsp2/
+ 
+		sudo rm -rf /ssd_data/*     
+		sudo cp -a /backups/ssd_data/. /ssd_data/
+
+
+13. Sprawdź uprawnienia
+	sudo chown -R postgres:postgres /var/lib/postgresql/18/main/
+	sudo chmod 700 /var/lib/postgresql/18/main
+
+14. Uruchom postgresa
+	sudo systemctl start postgresql
+	sudo systemctl status postgresql
+
+15.  W razie błędów sprawdź logi
+	sudo tail -f /var/log/postgresql/postgresql-18-main.log
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
