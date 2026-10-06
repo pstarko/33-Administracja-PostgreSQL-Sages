@@ -1,0 +1,12 @@
+Na poziomie terminala (user postgres)
+
+1. pg_dump -Fc -d Company -f /backups/company.dump --backup bazy Company (Case Sensitive)
+
+2. pg_dumpall --globals-only -f /backups/globals.sql --backup tablespace & ról
+
+
+RESTORE
+
+3. psql -f /backups/globals.sql -- odtworzenie ustawień tablespace & ról
+
+4. pg_restore -C -d postgres /backups/company.dump -- restore bazy
