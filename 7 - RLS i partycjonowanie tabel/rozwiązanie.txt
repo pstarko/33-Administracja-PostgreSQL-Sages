@@ -16,3 +16,30 @@ LIMIT 1000000;
 
 -- Dodajemy standardowy indeks na datę (dla sprawiedliwego porównania)
 CREATE INDEX idx_flat_data ON sprzedaz_flat(data_sprzedazy);
+
+
+
+-- Tworzymy tabelę nadrzędną (logiczna struktura)
+CREATE TABLE sprzedaz_part (
+    id INT,
+    data_sprzedazy DATE NOT NULL,
+    kwota DECIMAL(10,2),
+    klient_id INT
+) PARTITION BY RANGE (data_sprzedazy);
+
+
+-- Tworzymy partycje fizyczne (np. kwartalne)
+CREATE TABLE sprzedaz_q1 PARTITION OF sprzedaz_part FOR VALUES FROM ('2025-01-01') TO ('2025-04-01');
+CREATE TABLE sprzedaz_q2 PARTITION OF sprzedaz_part FOR VALUES FROM ('2025-04-01') TO ('2025-07-01');
+CREATE TABLE sprzedaz_q3 PARTITION OF sprzedaz_part FOR VALUES FROM ('2025-07-01') TO ('2025-10-01');
+CREATE TABLE sprzedaz_q4 PARTITION OF sprzedaz_part FOR VALUES FROM ('2025-10-01') TO ('2026-01-01');
+
+
+-- Proponowane indeksy:
+-- W PostgreSQL indeksy na tabeli nadrzędnej są automatycznie propagowane na partycje.
+CREATE INDEX idx_part_data ON sprzedaz_part(data_sprzedazy);
+
+
+-- Przenosimy dane z tabeli płaskiej do partycjonowanej
+INSERT INTO sprzedaz_part SELECT * FROM sprzedaz_flat;
+
