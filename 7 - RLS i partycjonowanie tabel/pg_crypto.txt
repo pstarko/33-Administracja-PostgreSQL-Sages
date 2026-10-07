@@ -1,0 +1,48 @@
+--1. Szyfrowanie na poziomie kolumny lub tabeli (w bazie)
+
+/*
+pgcrypto to standardowe rozszerzenie z contrib, dostępne praktycznie wszędzie, także w RDS, Cloud SQL i Azure.
+*/
+
+CREATE EXTENSION pgcrypto;
+
+drop table klienci;
+
+CREATE TABLE klienci (
+    id         bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    imie       text NOT NULL,
+    pesel_enc  bytea            -- zaszyfrowany PESEL
+);
+
+-- szyfrowanie symetryczne (OpenPGP)
+INSERT INTO klienci (imie, pesel_enc)
+VALUES ('Anna', pgp_sym_encrypt('90010112345', 'tajny_klucz'));
+
+select * from klienci;
+
+SELECT imie, pgp_sym_decrypt(pesel_enc, 'tajny_klucz') FROM klienci;
+
+-- hasła: hashowanie, nie szyfrowanie
+CREATE TABLE uzytkownicy (
+    id     bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    login  text NOT NULL UNIQUE,
+    haslo  text NOT NULL      -- hash bcrypt, np. $2a$06$...
+);
+
+INSERT INTO uzytkownicy (login, haslo)
+VALUES ('anna', crypt('haslo123', gen_salt('bf')));
+
+SELECT id, login, haslo
+FROM uzytkownicy
+WHERE login = 'anna'
+  AND haslo = crypt('haslo123', haslo);
+
+--Dostępne jest też szyfrowanie asymetryczne (pgp_pub_encrypt/pgp_pub_decrypt) oraz surowe encrypt()/decrypt() z AES.
+
+/*
+Ograniczenia tego podejścia:
+
+	Klucz trafia do zapytania, więc może wyciec do logów (log_statement, pg_stat_statements) i do widoku pg_stat_activity.
+	Na zaszyfrowanej kolumnie nie da się sensownie indeksować, sortować ani wyszukiwać LIKE. Przy wyszukiwaniu po równości można dodać osobną kolumnę z HMAC-em.
+	Superuser i tak może podejrzeć klucz w trakcie działania zapytania.
+*/
