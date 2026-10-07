@@ -1,0 +1,18 @@
+-- Tworzymy tabelę płaską
+CREATE TABLE sprzedaz_flat (
+    id SERIAL,
+    data_sprzedazy DATE NOT NULL,
+    kwota DECIMAL(10,2),
+    klient_id INT
+);
+
+INSERT INTO sprzedaz_flat (data_sprzedazy, kwota, klient_id)
+SELECT 
+    generate_series('2025-01-01'::date, '2025-12-31'::date, '32 seconds'::interval),
+    random() * 1000,
+    (random() * 10000)::int
+LIMIT 1000000;
+
+
+-- Dodajemy standardowy indeks na datę (dla sprawiedliwego porównania)
+CREATE INDEX idx_flat_data ON sprzedaz_flat(data_sprzedazy);
